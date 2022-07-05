@@ -1,7 +1,7 @@
 E->TM
 M->+TM
 M->$
-T->FM
+T->FX
 X->*FX
 X->$
 F->(E)

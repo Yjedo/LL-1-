@@ -2,7 +2,6 @@ package com.yyd.ll1.LL1;
 
 import com.yyd.ll1.enity.Data;
 import com.yyd.ll1.enity.ResultData;
-import org.springframework.util.ClassUtils;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -37,7 +36,7 @@ public class LL1 {
     //输入句子
     private String string;
     //句子读取位置标识
-    private int index = 0;
+    private int index;
 
     private Stack<String> stack = new Stack<>();
 
@@ -60,15 +59,26 @@ public class LL1 {
     //输出数据表
     private List<List<String>> outData = new ArrayList<>();
 
+    /**
+     * 封装分析表返回信息
+     * @return
+     */
     public  List<List<String>> getData(){
 
         List<List<String>> result = new ArrayList<>();
 
+        List<String> tempNT = new ArrayList<>();
+        Arrays.stream(VT).forEach((String s)->tempNT.add(s));
+        tempNT.add("#");
+
         List<String> L = new ArrayList<>();
         L.add(" ");
-        for(String s : VT){
-            System.out.println(s);
-            L.add(s);
+        for(String s : tempNT){
+            if(!s.equals("$")){
+                System.out.println(s);
+                L.add(s);
+            }
+
         }
         result.add(L);
 
@@ -79,12 +89,15 @@ public class LL1 {
         }
 
         int i = 1;
+
         for(String s1 : VN){
-            for(String s2 : VT){
-                if(M.get(s1+":"+s2)!=null){
-                    result.get(i).add(M.get(s1+":"+s2));
-                }else {
-                    result.get(i).add(" ");
+            for(String s2 : tempNT){
+                if(!s2.equals("$")){
+                    if(M.get(s1+":"+s2)!=null){
+                        result.get(i).add(M.get(s1+":"+s2));
+                    }else {
+                        result.get(i).add(" ");
+                    }
                 }
             }
             i++;
@@ -95,16 +108,21 @@ public class LL1 {
         return result;
     }
 
-
     /**
      * 流程控制
-     * @param string
+     * @param
      */
-    public Object run(String string) throws IOException {
-        readGS("src/main/resources/static/GSdata.txt");
-        init(string);
+    public Object run() throws IOException {
+
+        if(GS.keySet().size() == 0){
+            System.out.println("文法创建失败, 无法运行");
+            return null;
+        }
+
+        //生成分析表
         initM();
 
+        //初始化第一行
         List<String> L = new ArrayList<>();
         L.add("1");
         L.add("#E");
@@ -118,26 +136,33 @@ public class LL1 {
 
         int i = 1;
         index = 0;
-        tempCh = "i";
+        tempCh = getNextChar();
         while (runFlag){
             List<String> rowOut = new ArrayList<>();
             this.X = stack.pop();
             action.delete(0, action.length());
             String creatStr = "";
-            if (Util.isInArray(VT, X)){
+            if (Util.isInArray(VT, X) && !X.equals("$")){
 
                 if (X.equals(tempCh)) {
                     action.append("GETNEXT");
+                    index++;
                     tempCh = getNextChar();
 
                 }
                 else System.out.println("输入字符串中包含未识别字符");
 
-            }  else if(M.get(X+":"+tempCh) != null && !tempCh.equals("#")){
+            } else if(X.equals("#")){
+                if(X.equals(tempCh)) break;
+                else{
+                    System.out.println("该句子包含未知字符");
+                    return null;
+                }
+            } else if(M.get(X+":"+tempCh) != null){
                 creatStr = M.get(X+":"+tempCh);
                 String[] strings = M.get(X+":"+tempCh).split("");
                 action.append("POP");
-                if(!strings[3].equals("#")){
+                if(!strings[3].equals("$")){
                     String tempStr = "";
                     for(int k = strings.length-1; k > 2; k--){
                         stack.push(strings[k]);
@@ -147,18 +172,14 @@ public class LL1 {
                     action.append(", PUSH("+ tempStr +")");
                 }
 
-            } else if(M.get(X+":"+tempCh) != null && tempCh.equals("#")){
-                action.append("POP");
-                creatStr = M.get(X+":"+"#");
-                System.out.println("分析结束");
-                runFlag = false;
+            }else if(M.get(X+":"+tempCh) == null){
 
-            }else if(M.get(X+":"+"#") != null){
-                action.append("POP");
-                creatStr = M.get(X+":"+"#");
-
-            }else {
-//                System.out.println("分析完成");
+                System.out.println(index + X+"无法推出"+ tempCh);
+                return null;
+            } else {
+                System.out.println(X+tempCh);
+                System.out.println("该句子不属于此文法");
+                return null;
             }
             i++;
             //步骤
@@ -190,6 +211,7 @@ public class LL1 {
             System.out.println(s);
         });
 
+        //将分析过程封装打包返回
         Data data = new Data();
         data.data = packageResult();
         data.M = getData();
@@ -203,8 +225,8 @@ public class LL1 {
      * @return
      */
     private String getNextChar(){
-        index++;
-        return  this.string.substring(index, index+1);
+
+        return  String.valueOf(this.string.charAt(index));
     }
 
     /**
@@ -213,9 +235,8 @@ public class LL1 {
      */
     public void init(String s){
         this.string = s;
+        System.out.println("输入句子为: "+s);
         stack.push("#");
-        tempCh = getNextChar();
-
     }
 
     /**
@@ -226,27 +247,41 @@ public class LL1 {
         Follow = new HashMap<>();
         M = new HashMap<>();
 
-        for(String s : VN){
-            //获取所有非终结符的First集与Follow集
-            First.put(s, getFirst(s));
-            Follow.put(s, getFollow(s));
+        try {
+            for(String s : VN){
+                //获取所有非终结符的First集与Follow集
+                First.put(s, getFirst(s));
+                Follow.put(s, getFollow(s));
+            }
+        }catch (Exception e){
+            System.out.println(First.toString());
+            System.out.println(Follow.toString());
+            return;
         }
+
+        List<String> tempNT = new ArrayList<>();
+        Arrays.stream(VT).forEach((String s)->tempNT.add(s));
+
+        //将结束符#加入
+        tempNT.add("#");
 
         for (String key : GS.keySet()) {
             List<String> strList = GS.get(key);
             for (String str : strList) {
-                for(String s : VT){
-                    List<String> tempFirst = getFirst(str);
-                    //遍历终结符
-                    if(tempFirst.contains(s)){
-                        //若a在str的first集中
-                        M.put(key+":"+s,key+"->"+str );
-                    }
+                for(String s : tempNT){
+                    if(!s.equals("$")){
+                        List<String> tempFirst = getFirst(str);
+                        //遍历终结符
+                        if(tempFirst.contains(s)){
+                            //若a在str的first集中
+                            M.put(key+":"+s,key+"->"+str );
+                        }
 
-                    if(tempFirst.contains("#")){
-                        //若str的first集包含空
-                        if(Follow.get(key).contains(s)){
-                            M.put(key+":"+s,key+"->"+str);
+                        if(tempFirst.contains("$")){
+                            //若str的first集包含空
+                            if(Follow.get(key).contains(s)){
+                                M.put(key+":"+s,key+"->"+str);
+                            }
                         }
                     }
                 }
@@ -277,9 +312,14 @@ public class LL1 {
                 List<String> tempFirst = new ArrayList<>();
                 for(String str : strList){
                     List<String> tempList = getFirst(str);
-                    tempFirst = sumList(tempFirst, tempList);
+                    try {
+                        tempFirst = sumList(tempFirst, tempList);
+                    }catch (Exception e){
+                        System.out.println(e);
+                        System.out.println(gsChar + tempFirst + tempList);
+                        return null;
+                    }
                 }
-
                 if(tempFirst.contains("$")){
                     //如果包含空字符
                     firstOfGsChar = addAllNotNullItem(firstOfGsChar, tempFirst);
@@ -289,15 +329,12 @@ public class LL1 {
                     flag = false;
                     break;
                 }
-
             }
         }
-
         if (flag && i==gsChar.length()){
             //如果gsChar中全为非终结符，且全部可推出$, 则将$加入firstOfGsChar
             firstOfGsChar.add("$");
         }
-
         return firstOfGsChar;
     }
 
@@ -311,6 +348,7 @@ public class LL1 {
             followOfGsChar.add("#");
         }
         for (String key : GS.keySet()){
+            if (key.equals(gsChar))continue;
             List<String> strList = GS.get(key);
             for (String str:strList){
                 //遍历文法中所有产生式
@@ -321,7 +359,7 @@ public class LL1 {
                         if (pos == str.length()-1 && !gsChar.equals(key)){
                             //在最后一个出现
                             followOfGsChar = sumList(followOfGsChar, getFollow(key));
-                        } else{
+                        } else if(!gsChar.equals(key)){
                             //在中间出现
                             String tempChar = str.substring(pos+1);
 
@@ -394,6 +432,68 @@ public class LL1 {
     }
 
     /**
+     * 通过参数传递文法和待测句子
+     */
+    public void readGS(String gsData, String str){
+        String[] strings = gsData.split("\n");
+        //TODO 左递归情况处理
+
+        //TODO 右回溯情况处理
+
+        //存放经过处理的产生式集合
+        List<String> newStrings = new ArrayList<>();
+        //将带有或 | 运算符的产生式分解为一个或多个
+        Arrays.stream(strings).forEach((String s)->{
+            String leftStr = s.substring(0, 1);
+            String rightStr = s.substring(3);
+
+            String[] tempPtrings = {rightStr};
+
+            if(rightStr.contains("|")){
+                tempPtrings = rightStr.split("|");
+            }
+
+            for(String item:tempPtrings){
+                newStrings.add(leftStr+"->"+item);
+            }
+        });
+
+
+        GS = new HashMap<>();
+
+        //临时存放终结符
+        List<String> vtList = new ArrayList<>();
+
+        newStrings.stream().forEach((String s)->{
+            String leftStr = s.substring(0, 1);
+            String rightStr = s.substring(3);
+
+            for (int i = 0; i < rightStr.length(); i++){
+                //提取终结符
+                if(!(rightStr.charAt(i) >= 'A' && rightStr.charAt(i) <= 'Z')){
+                    vtList.add(String.valueOf(rightStr.charAt(i)));
+                }
+            }
+//            System.out.println(rightStr+" "+leftStr);
+            if(GS.containsKey(leftStr)){
+                //如果该非终结符已经存在产生式, 则将后续产生式加入到其产生式表中
+                GS.get(leftStr).add(rightStr);
+            }else {
+                ArrayList<String> strList = new ArrayList<>();
+                strList.add(rightStr);
+                GS.put(leftStr, strList);
+            }
+        });
+
+
+        init(str);
+
+        //对终结符集与非终结符集赋值
+        VN = GS.keySet().toArray(new String[0]);
+        VT = vtList.stream().distinct().collect(Collectors.toList()).toArray(new String[0]);
+    }
+
+    /**
      * 消除文法左递归
      */
     private void cancelLeft(){
@@ -418,16 +518,6 @@ public class LL1 {
         return B.stream().distinct().filter((String s)->!s.equals("$")).collect(Collectors.toList());
     }
 
-    private boolean isHaveXa(String gsChar){
-        //判断gsChar是否具有X->a...的产生式
-        for (String item : GS.get(gsChar)){
-            if(Util.isInArray(VT, item.substring(0, 1))){
-                return true;
-            }
-        }
-        return false;
-    }
-
 
     /**
      * 合并两集合元素并去重
@@ -436,10 +526,27 @@ public class LL1 {
      * @return
      */
     private List<String> sumList(List<String> A, List<String> B){
-        A.stream().forEach((String s)->B.add(s));
+        A.forEach((String s)-> System.out.print(s));
+        System.out.println(" ");
+        B.forEach((String s)-> System.out.print(s));
+        System.out.println(" ");
+        try {
+            A.stream().forEach((String s)->B.add(s));
+        }catch (StackOverflowError e){
+            System.out.println(e);
+            A.forEach((String s)-> System.out.println(s));
+            B.forEach((String s)-> System.out.println(s));
+            return null;
+        }
         return B.stream().distinct().collect(Collectors.toList());
     }
 
+
+    /**
+     * 封装
+     * @param m
+     * @return
+     */
     private List<String> packageData(Map<String, List<String>> m){
         List<String> list = new ArrayList<>();
         for (String key:m.keySet()){
@@ -453,6 +560,10 @@ public class LL1 {
         return list;
     }
 
+    /**
+     * 封装分析信息数据
+     * @return
+     */
     private List<ResultData> packageResult(){
         return outData.stream().map((List<String> list)->{
             ResultData resultData = new ResultData();

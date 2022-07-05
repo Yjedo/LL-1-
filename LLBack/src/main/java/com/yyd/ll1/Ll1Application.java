@@ -13,7 +13,19 @@ public class Ll1Application {
 
         SpringApplication.run(Ll1Application.class, args);
         LL1 ll1 = new LL1();
-        ll1.run("i+i*i#");
+        ll1.readGS("src/main/resources/static/GSdata2.txt");
+        ll1.init("i*i+i#");
+        ll1.run();
+//        ll1.getFirst("E");
+//        ll1.getFirst("M");
+//
+//        ll1.getFirst("T");
+//
+//        ll1.getFirst("X");
+//        ll1.getFirst("F");
+
+//        ll1.init("i+i*i#");
+//        ll1.run();
     }
 
 }

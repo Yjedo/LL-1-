@@ -1,10 +1,10 @@
 E->TG
 G->+TG
 G->-TG
-G->#
+G->$
 T->FS
 S->*FS
 S->/FS
-S->#
+S->$
 F->(E)
 F->i

@@ -1,18 +1,14 @@
 <template>
   <div id="app">
-    <h1>LL(1)文法分析器</h1>
-    <LL1></LL1>
+    <router-view></router-view>
   </div>
 </template>
 
 <script>
-import LL1 from './components/LL1.vue'
 
 export default {
   name: 'App',
-  components: {
-    LL1,
-  }
+ 
 }
 </script>
 
